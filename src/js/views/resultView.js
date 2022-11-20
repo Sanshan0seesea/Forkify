@@ -14,9 +14,15 @@ class ResultView extends View {
   }
 
   _generateMarkupPreview(result) {
+    const id = window.location.hash.slice(1);
+    //👆这行是什么意思
+
+    //result.id === id ? 'preview__link--active' : ''}" href="#${result.id}">👇是为了运行那个mark的系统
     return `
     <li class="preview">
-      <a class="preview__link" href="#${result.id}">
+      <a class="preview__link ${
+        result.id === id ? 'preview__link--active' : ''
+      }" href="#${result.id}">
         <figure class="preview__fig">
           <img src="${result.image}" alt="${result.title}" />
         </figure>

@@ -23,6 +23,35 @@ class RecipeView extends View {
     ['hashchange', 'load'].forEach(ev => window.addEventListener(ev, handler));
   }
 
+  addHandlerUpdateServings(handler) {
+    this._parentElement.addEventListener('click', function (e) {
+      const btn = e.target.closest('.btn--update-servings');
+      //👆这种写法是因为有时候可能没点到按钮而是点到了svg之类的，所以需要寻找最近的那个
+      if (!btn) return;
+      // console.log(btn);
+
+      //👇btn.dataset.updateTo指的就是serving几位的那个➕号和➖号的按钮上的那个名叫data-update-to="${this._data.servings-1}"的tag，data-update-to会被转化成camel格式，所以这里才要这样写
+
+      // const updateTo = +btn.dataset.updateTo;
+
+      //👆+号还是为了把btn.dataset里面的数据弄成一个数字
+      //但是还是可以简写，比如下面这样子
+      const { updateTo } = btn.dataset;
+
+      //👇把updateTo弄到传过来的函数handler里，传到controller里面
+      if (+updateTo > 0) handler(+updateTo);
+      //👆先用+把update变成数字，再如果这个数字大于0的时候，才传送数据到controller，否则不用变
+    });
+  }
+
+  addHandlerAddBookmark(handler) {
+    this._parentElement.addEventListener('click', function (e) {
+      const btn = e.target.closest('.btn--bookmark');
+      if (!btn) return;
+      handler();
+    });
+  }
+
   _generateMarkup() {
     return `
     <figure class="recipe__fig">
@@ -54,12 +83,16 @@ class RecipeView extends View {
           <span class="recipe__info-text">servings</span>
 
           <div class="recipe__info-buttons">
-            <button class="btn--tiny btn--increase-servings">
+            <button class="btn--tiny btn--update-servings" data-update-to="${
+              this._data.servings - 1
+            }">
               <svg>
                 <use href="${icons}#icon-minus-circle"></use>
               </svg>
             </button>
-            <button class="btn--tiny btn--increase-servings">
+            <button class="btn--tiny btn--update-servings" data-update-to="${
+              this._data.servings + 1
+            }">
               <svg>
                 <use href="${icons}#icon-plus-circle"></use>
               </svg>
@@ -69,9 +102,11 @@ class RecipeView extends View {
 
         <div class="recipe__user-generated">
         </div>
-        <button class="btn--round">
+        <button class="btn--round btn--bookmark">
           <svg class="">
-            <use href="${icons}#icon-bookmark-fill"></use>
+            <use href="${icons}#icon-bookmark${
+      this._data.bookmarked ? '-fill' : ''
+    }"></use>
           </svg>
         </button>
       </div>

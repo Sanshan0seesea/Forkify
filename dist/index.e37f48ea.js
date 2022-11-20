@@ -548,6 +548,7 @@ var _runtime = require("regenerator-runtime/runtime");
 //   module.hot.accept();
 // }
 //这只是来自parcel
+//写npm start
 //controller中是程序逻辑
 //也就是开关与开关之间的逻辑，是最大的逻辑
 //⚠️如果有时候发现写对了但网页不现实，请停止parcel，再来一次
@@ -566,6 +567,8 @@ const controlRecipes = async function() {
         // guard line
         if (!id) return;
         (0, _recipeViewJsDefault.default).renderSpinner();
+        //0)update results view to mark selected search result
+        (0, _resultViewJsDefault.default).update(_modelJs.getSearchResultsPage());
         //1) loading recipe
         await _modelJs.loadRecipe(id);
         //因为是异步函数，所以需要await
@@ -573,6 +576,9 @@ const controlRecipes = async function() {
         (0, _recipeViewJsDefault.default).render(_modelJs.state.recipe);
     //上面一行等于下面这行，是一样的，就是再次呈现
     //  const recipeView=new recipeView(model.state.recipe);
+    //下面这行是为了方便更新不同人数，所以需要启动一下
+    // controllerServings();
+    //👆测试的时候才放这里，实际上需要它在每次点击的时候都运行一次
     } catch (err) {
         (0, _recipeViewJsDefault.default).renderError();
     //此处不需要传入任何数据，让renderError用自己的默认数值
@@ -591,7 +597,7 @@ const controlSearchResults = async function() {
         //3 展示结果
         // console.log(model.state.search.results);
         // resultView.render(model.state.search.results);
-        (0, _resultViewJsDefault.default).render(_modelJs.getSearchResultsPage(3));
+        (0, _resultViewJsDefault.default).render(_modelJs.getSearchResultsPage());
         //4 also render initial pagination btns
         (0, _paginationViewJsDefault.default).render(_modelJs.state.search);
     //把数据传到paginationView里面去
@@ -611,11 +617,33 @@ const controlPagination = function(goToPage) {
 //把数据传到paginationView里面去
 };
 //这个function只是做一些摁开关的事情，本身并不是程序，真正的功能在model里
+//下面这个也可以被叫做handler，因为它就只是任务处理器，只不过是因为我们现在在MVC模板中所以它现在叫controller
+const controllerServings = function(newServings) {
+    //在运行完recipeView.addHandlerUpdateServings之后，recipeView.addHandlerUpdateServings的最后一行才写着运行这个handler的事情，传送了一些数据回来。
+    //update the recipe servings (in state)
+    _modelJs.updateServings(newServings);
+    //第一个版本：update the recipe view(就再复制一遍就可以了，就只是再直接执行一遍render，把数据显示到前端)
+    // recipeView.render(model.state.recipe);
+    //第二个版本：每一次都重新render一遍太浪费内存了，所以最好是只update更新了的部分
+    (0, _recipeViewJsDefault.default).update(_modelJs.state.recipe);
+};
+const controlAddBookMark = function() {
+    _modelJs.addBookmark(_modelJs.state.recipe);
+    //👆把数据的mark变过来
+    console.log(_modelJs.state.recipe);
+    (0, _recipeViewJsDefault.default).update(_modelJs.state.recipe);
+//👆把外观的mark变过来
+};
 //这个函数是订阅者，init是在程序一开始就已经开始运转了。在一开始就把controlrecipes传递到View那边。
 const init = function() {
     (0, _recipeViewJsDefault.default).addHandlerRender(controlRecipes);
+    (0, _recipeViewJsDefault.default).addHandlerUpdateServings(controllerServings);
+    (0, _recipeViewJsDefault.default).addHandlerAddBookmark(controlAddBookMark);
     (0, _searchViewJsDefault.default).addHandlerSearch(controlSearchResults);
     (0, _paginationViewJsDefault.default).addHandClick(controlPagination);
+// controllerServings();
+//👆不能放在这里，因为是异步函数，在这里启动这个function的话，API的数据都还没通过异步函数传过来，读取undefined的话肯定报错。要放到异步函数里面去。
+//这一部分是把数据传到function中
 };
 init();
 
@@ -1752,6 +1780,8 @@ parcelHelpers.export(exports, "state", ()=>state);
 parcelHelpers.export(exports, "loadRecipe", ()=>loadRecipe);
 parcelHelpers.export(exports, "loadSearchResults", ()=>loadSearchResults);
 parcelHelpers.export(exports, "getSearchResultsPage", ()=>getSearchResultsPage);
+parcelHelpers.export(exports, "updateServings", ()=>updateServings);
+parcelHelpers.export(exports, "addBookmark", ()=>addBookmark);
 var _regeneratorRuntime = require("regenerator-runtime");
 var _configJs = require("./config.js");
 var _helpersJs = require("./helpers.js");
@@ -1762,7 +1792,8 @@ const state = {
         results: [],
         page: 1,
         resultsPerPage: (0, _configJs.RES_PER_PAGE)
-    }
+    },
+    bookmarks: []
 };
 const loadRecipe = async function(id) {
     try {
@@ -1799,6 +1830,8 @@ const loadSearchResults = async function(query) {
                 image: rec.image_url
             };
         });
+        state.search.page = 1;
+    //👆要重新设置，否则page会一直停留在上一次留在的页数上
     } catch (err) {
         console.log(`${err}💣`);
         throw err;
@@ -1811,6 +1844,19 @@ const getSearchResultsPage = function(page = state.search.page) {
     const end = page * state.search.resultsPerPage;
     //如果我们需要page1的话，那么start是0，结尾是10——为了方便用slice分割得到的结果
     return state.search.results.slice(start, end);
+};
+const updateServings = function(newServings) {
+    state.recipe.ingredients.forEach((ing)=>{
+        ing.quantity = ing.quantity * newServings / state.recipe.servings;
+    //newQuantity=(OldQuantity*newServings)/state.recipe.servings;
+    });
+    state.recipe.servings = newServings;
+};
+const addBookmark = function(recipe) {
+    //add bookmark
+    state.bookmarks.push(recipe);
+    //mark current recipe as a bookmark
+    if (recipe.id === state.recipe.id) state.recipe.bookmarked = true;
 };
 
 },{"regenerator-runtime":"dXNgZ","./config.js":"k5Hzs","./helpers.js":"hGI1E","@parcel/transformer-js/src/esmodule-helpers.js":"gkKU3"}],"dXNgZ":[function(require,module,exports) {
@@ -2481,6 +2527,29 @@ class RecipeView extends (0, _viewDefault.default) {
             "load"
         ].forEach((ev)=>window.addEventListener(ev, handler));
     }
+    addHandlerUpdateServings(handler) {
+        this._parentElement.addEventListener("click", function(e) {
+            const btn = e.target.closest(".btn--update-servings");
+            //👆这种写法是因为有时候可能没点到按钮而是点到了svg之类的，所以需要寻找最近的那个
+            if (!btn) return;
+            // console.log(btn);
+            //👇btn.dataset.updateTo指的就是serving几位的那个➕号和➖号的按钮上的那个名叫data-update-to="${this._data.servings-1}"的tag，data-update-to会被转化成camel格式，所以这里才要这样写
+            // const updateTo = +btn.dataset.updateTo;
+            //👆+号还是为了把btn.dataset里面的数据弄成一个数字
+            //但是还是可以简写，比如下面这样子
+            const { updateTo  } = btn.dataset;
+            //👇把updateTo弄到传过来的函数handler里，传到controller里面
+            if (+updateTo > 0) handler(+updateTo);
+        //👆先用+把update变成数字，再如果这个数字大于0的时候，才传送数据到controller，否则不用变
+        });
+    }
+    addHandlerAddBookmark(handler) {
+        this._parentElement.addEventListener("click", function(e) {
+            const btn = e.target.closest(".btn--bookmark");
+            if (!btn) return;
+            handler();
+        });
+    }
     _generateMarkup() {
         return `
     <figure class="recipe__fig">
@@ -2506,12 +2575,12 @@ class RecipeView extends (0, _viewDefault.default) {
           <span class="recipe__info-text">servings</span>
 
           <div class="recipe__info-buttons">
-            <button class="btn--tiny btn--increase-servings">
+            <button class="btn--tiny btn--update-servings" data-update-to="${this._data.servings - 1}">
               <svg>
                 <use href="${0, _iconsSvgDefault.default}#icon-minus-circle"></use>
               </svg>
             </button>
-            <button class="btn--tiny btn--increase-servings">
+            <button class="btn--tiny btn--update-servings" data-update-to="${this._data.servings + 1}">
               <svg>
                 <use href="${0, _iconsSvgDefault.default}#icon-plus-circle"></use>
               </svg>
@@ -2521,9 +2590,9 @@ class RecipeView extends (0, _viewDefault.default) {
 
         <div class="recipe__user-generated">
         </div>
-        <button class="btn--round">
+        <button class="btn--round btn--bookmark">
           <svg class="">
-            <use href="${0, _iconsSvgDefault.default}#icon-bookmark-fill"></use>
+            <use href="${0, _iconsSvgDefault.default}#icon-bookmark${this._data.bookmarked ? "-fill" : ""}"></use>
           </svg>
         </button>
       </div>
@@ -2587,6 +2656,34 @@ class View {
         this._clear();
         //在插入新的内容之前，需要把之前的内容清除
         this._parentElement.insertAdjacentHTML("afterbegin", markup);
+    //👆这个_parent是哪里来的啊
+    }
+    update(data) {
+        // if (!data || (Array.isArray(data) && data.length === 0))
+        //   return this.renderError();
+        //在一开始就检查有没有数据，并且还要检查是不是一个空的数组（也就是检查有没有
+        //👆这在update中不需要
+        this._data = data;
+        //为了储存传过来的data
+        //这个update要做的事情就是比较DOM元素，然后只更新不一样的部分。
+        //需要使用到一些技巧，这个技巧就是把markup字符转成内存中的dom对象，然后用它来和实际的DOM进行比较
+        const newMarkup = this._generateMarkup();
+        const newDOM = document.createRange().createContextualFragment(newMarkup);
+        //👆构建了一个虚拟的DOM，不存在页面上，只存在我们的内存中（memory
+        const newElements = Array.from(newDOM.querySelectorAll("*"));
+        const curElements = Array.from(this._parentElement.querySelectorAll("*"));
+        newElements.forEach((newEl, i)=>{
+            const curEl = curElements[i];
+            // console.log(curEl, newEl.isEqualNode(curEl));
+            //isEqualNode可以比较每个节点的内容是否是相同
+            //在高级DOM部分的开头有很好地介绍了节点和元素之间的区别
+            //👇updates changed TEXT（说这部分是最难懂的）
+            if (!newEl.isEqualNode(curEl) && newEl.firstChild.nodeValue.trim() !== "") // console.log('💥', newEl.firstChild.nodeValue.trim());
+            curEl.textContent = newEl.textContent;
+            //updates changed Attributes（说这部分是最难懂的）
+            if (!newEl.isEqualNode(curEl)) // console.log(Array.from(newEl.attributes));
+            Array.from(newEl.attributes).forEach((att)=>curEl.setAttribute(att.name, att.value));
+        });
     }
     _clear() {
         this._parentElement.innerHTML = "";
@@ -2969,9 +3066,12 @@ class ResultView extends (0, _viewDefault.default) {
         return this._data.map(this._generateMarkupPreview).join("");
     }
     _generateMarkupPreview(result) {
+        const id = window.location.hash.slice(1);
+        //👆这行是什么意思
+        //result.id === id ? 'preview__link--active' : ''}" href="#${result.id}">👇是为了运行那个mark的系统
         return `
     <li class="preview">
-      <a class="preview__link" href="#${result.id}">
+      <a class="preview__link ${result.id === id ? "preview__link--active" : ""}" href="#${result.id}">
         <figure class="preview__fig">
           <img src="${result.image}" alt="${result.title}" />
         </figure>

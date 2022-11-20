@@ -10,6 +10,7 @@ export const state = {
     page: 1,
     resultsPerPage: RES_PER_PAGE,
   },
+  bookmarks: [],
 };
 
 //state就只是一个大仓库
@@ -52,6 +53,8 @@ export const loadSearchResults = async function (query) {
         image: rec.image_url,
       };
     });
+    state.search.page = 1;
+    //👆要重新设置，否则page会一直停留在上一次留在的页数上
   } catch (err) {
     console.log(`${err}💣`);
     throw err;
@@ -65,4 +68,23 @@ export const getSearchResultsPage = function (page = state.search.page) {
   const end = page * state.search.resultsPerPage;
   //如果我们需要page1的话，那么start是0，结尾是10——为了方便用slice分割得到的结果
   return state.search.results.slice(start, end);
+};
+
+export const updateServings = function (newServings) {
+  state.recipe.ingredients.forEach(ing => {
+    ing.quantity = (ing.quantity * newServings) / state.recipe.servings;
+    //newQuantity=(OldQuantity*newServings)/state.recipe.servings;
+  });
+  state.recipe.servings = newServings;
+};
+
+export const addBookmark = function (recipe) {
+  //add bookmark
+  state.bookmarks.push(recipe);
+
+  //mark current recipe as a bookmark
+
+  if (recipe.id === state.recipe.id) {
+    state.recipe.bookmarked = true;
+  }
 };
