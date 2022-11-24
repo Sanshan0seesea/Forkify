@@ -1,8 +1,11 @@
 import * as model from './model.js';
+import { MODAL_CLOSE_SEC } from './config.js';
 import recipeView from './views/recipeView.js';
 import searchView from './views/searchView.js';
 import resultView from './views/resultView.js';
 import paginationView from './views/paginationView.js';
+import bookmarksView from './views/bookmarksView';
+import addRecipeView from './views/addRecipeView.js';
 
 import 'core-js/stable';
 import 'regenerator-runtime/runtime';
@@ -47,13 +50,16 @@ const controlRecipes = async function () {
 
     resultView.update(model.getSearchResultsPage());
 
-    //1) loading recipe
+    //1）update bookmarks view
+    bookmarksView.update(model.state.bookmarks);
+
+    //2) loading recipe
 
     await model.loadRecipe(id);
 
     //因为是异步函数，所以需要await
 
-    //2)rendering recipe
+    //3)rendering recipe
     recipeView.render(model.state.recipe);
     //上面一行等于下面这行，是一样的，就是再次呈现
     //  const recipeView=new recipeView(model.state.recipe);
@@ -130,20 +136,66 @@ const controllerServings = function (newServings) {
 };
 
 const controlAddBookMark = function () {
-  model.addBookmark(model.state.recipe);
-  //👆把数据的mark变过来
+  //1)👇实现有bookmark时候就删除，不是的时候才添加bookmark
+  if (!model.state.recipe.bookmarked) model.addBookmark(model.state.recipe);
+  else model.deleteBookmark(model.state.recipe.id);
+
+  //2)👆把数据的mark变过来
   console.log(model.state.recipe);
   recipeView.update(model.state.recipe);
   //👆把外观的mark变过来
+
+  //3)render bookmarks
+  bookmarksView.render(model.state.bookmarks);
+  //👆因为储存了所有关于Bookmark的数据，所以可以这样读取，因为在右上角那个bookmark区我们需要其他信息，这个显示条和左侧是一样的，所以需要的信息也和左侧一样
+};
+
+const controlBookmarks = function () {
+  bookmarksView.render(model.state.bookmarks);
+};
+
+const controlAddRecipe = async function (newRecipe) {
+  try {
+    //show loading spinner
+    addRecipeView.renderSpinner();
+    //1）upload new recipe data
+    await model.uploadRecipe(newRecipe);
+    console.log(model.state.recipe);
+    //这里需要await因为如果不等那个异步函数把信息传回来的话，这个controller没办法用
+
+    //2)render recipe
+    recipeView.render(model.state.recipe);
+
+    //success message
+    addRecipeView.renderMessage();
+
+    //Render bookmark view
+    bookmarksView.render(model.state.bookmarks);
+    //👆不用update是因为我们确实想插入一个新的元素
+
+    //change ID in Url
+    window.history.pushState(null, '', `#${model.state.recipe.id}`);
+    //👆这个方法可以不用reload页面就改变这一页的内容，第三个argument才重要，就是URL
+    //3）Close form window
+    setTimeout(function () {
+      // addRecipeView.toggleWindow();
+    }, MODAL_CLOSE_SEC * 1000);
+  } catch (err) {
+    //upload the new recipe data
+    console.error('💥', err);
+    addRecipeView.renderError(err.message);
+  }
 };
 
 //这个函数是订阅者，init是在程序一开始就已经开始运转了。在一开始就把controlrecipes传递到View那边。
 const init = function () {
+  bookmarksView.addHandlerRender(controlBookmarks);
   recipeView.addHandlerRender(controlRecipes);
   recipeView.addHandlerUpdateServings(controllerServings);
   recipeView.addHandlerAddBookmark(controlAddBookMark);
   searchView.addHandlerSearch(controlSearchResults);
   paginationView.addHandClick(controlPagination);
+  addRecipeView.addHandlerUpload(controlAddRecipe);
   // controllerServings();
   //👆不能放在这里，因为是异步函数，在这里启动这个function的话，API的数据都还没通过异步函数传过来，读取undefined的话肯定报错。要放到异步函数里面去。
 
@@ -151,3 +203,5 @@ const init = function () {
 };
 
 init();
+
+//现在再来创建一个

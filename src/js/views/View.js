@@ -3,7 +3,7 @@ import icons from 'url:../../img/icons.svg';
 export default class View {
   _data;
 
-  render(data) {
+  render(data, render = true) {
     if (!data || (Array.isArray(data) && data.length === 0))
       return this.renderError();
     //在一开始就检查有没有数据，并且还要检查是不是一个空的数组（也就是检查有没有
@@ -11,6 +11,10 @@ export default class View {
     this._data = data;
     //为了储存传过来的data
     const markup = this._generateMarkup();
+
+    if (!render) return markup;
+    //👆之所以到这里才return markup是因为只要return了markup，数据就会变成字符串，就传不了数据了，所以要先传好数据，再return一个字符串回去
+
     this._clear();
     //在插入新的内容之前，需要把之前的内容清除
     this._parentElement.insertAdjacentHTML('afterbegin', markup);
@@ -44,6 +48,8 @@ export default class View {
       //👇updates changed TEXT（说这部分是最难懂的）
       if (
         !newEl.isEqualNode(curEl) &&
+        newEl.firstChild &&
+        //👇因为下面会报错，所以直接在上面加一行
         newEl.firstChild.nodeValue.trim() !== ''
         //👆要找出那个最小的，有内容的元素，而不是整个盒子，否则会把整个盒子替换成纯文本的
       ) {

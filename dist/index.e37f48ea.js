@@ -533,8 +533,9 @@ function hmrAcceptRun(bundle, id) {
 
 },{}],"aenu9":[function(require,module,exports) {
 var parcelHelpers = require("@parcel/transformer-js/src/esmodule-helpers.js");
-var _webImmediateJs = require("core-js/modules/web.immediate.js");
+var _webImmediateJs = require("core-js/modules/web.immediate.js"); //现在再来创建一个
 var _modelJs = require("./model.js");
+var _configJs = require("./config.js");
 var _recipeViewJs = require("./views/recipeView.js");
 var _recipeViewJsDefault = parcelHelpers.interopDefault(_recipeViewJs);
 var _searchViewJs = require("./views/searchView.js");
@@ -543,6 +544,10 @@ var _resultViewJs = require("./views/resultView.js");
 var _resultViewJsDefault = parcelHelpers.interopDefault(_resultViewJs);
 var _paginationViewJs = require("./views/paginationView.js");
 var _paginationViewJsDefault = parcelHelpers.interopDefault(_paginationViewJs);
+var _bookmarksView = require("./views/bookmarksView");
+var _bookmarksViewDefault = parcelHelpers.interopDefault(_bookmarksView);
+var _addRecipeViewJs = require("./views/addRecipeView.js");
+var _addRecipeViewJsDefault = parcelHelpers.interopDefault(_addRecipeViewJs);
 var _runtime = require("regenerator-runtime/runtime");
 // if (module.hot) {
 //   module.hot.accept();
@@ -569,10 +574,12 @@ const controlRecipes = async function() {
         (0, _recipeViewJsDefault.default).renderSpinner();
         //0)update results view to mark selected search result
         (0, _resultViewJsDefault.default).update(_modelJs.getSearchResultsPage());
-        //1) loading recipe
+        //1）update bookmarks view
+        (0, _bookmarksViewDefault.default).update(_modelJs.state.bookmarks);
+        //2) loading recipe
         await _modelJs.loadRecipe(id);
         //因为是异步函数，所以需要await
-        //2)rendering recipe
+        //3)rendering recipe
         (0, _recipeViewJsDefault.default).render(_modelJs.state.recipe);
     //上面一行等于下面这行，是一样的，就是再次呈现
     //  const recipeView=new recipeView(model.state.recipe);
@@ -628,26 +635,64 @@ const controllerServings = function(newServings) {
     (0, _recipeViewJsDefault.default).update(_modelJs.state.recipe);
 };
 const controlAddBookMark = function() {
-    _modelJs.addBookmark(_modelJs.state.recipe);
-    //👆把数据的mark变过来
+    //1)👇实现有bookmark时候就删除，不是的时候才添加bookmark
+    if (!_modelJs.state.recipe.bookmarked) _modelJs.addBookmark(_modelJs.state.recipe);
+    else _modelJs.deleteBookmark(_modelJs.state.recipe.id);
+    //2)👆把数据的mark变过来
     console.log(_modelJs.state.recipe);
     (0, _recipeViewJsDefault.default).update(_modelJs.state.recipe);
-//👆把外观的mark变过来
+    //👆把外观的mark变过来
+    //3)render bookmarks
+    (0, _bookmarksViewDefault.default).render(_modelJs.state.bookmarks);
+//👆因为储存了所有关于Bookmark的数据，所以可以这样读取，因为在右上角那个bookmark区我们需要其他信息，这个显示条和左侧是一样的，所以需要的信息也和左侧一样
+};
+const controlBookmarks = function() {
+    (0, _bookmarksViewDefault.default).render(_modelJs.state.bookmarks);
+};
+const controlAddRecipe = async function(newRecipe) {
+    try {
+        //show loading spinner
+        (0, _addRecipeViewJsDefault.default).renderSpinner();
+        //1）upload new recipe data
+        await _modelJs.uploadRecipe(newRecipe);
+        console.log(_modelJs.state.recipe);
+        //这里需要await因为如果不等那个异步函数把信息传回来的话，这个controller没办法用
+        //2)render recipe
+        (0, _recipeViewJsDefault.default).render(_modelJs.state.recipe);
+        //success message
+        (0, _addRecipeViewJsDefault.default).renderMessage();
+        //Render bookmark view
+        (0, _bookmarksViewDefault.default).render(_modelJs.state.bookmarks);
+        //👆不用update是因为我们确实想插入一个新的元素
+        //change ID in Url
+        window.history.pushState(null, "", `#${_modelJs.state.recipe.id}`);
+        //👆这个方法可以不用reload页面就改变这一页的内容，第三个argument才重要，就是URL
+        //3）Close form window
+        setTimeout(function() {
+        // addRecipeView.toggleWindow();
+        }, (0, _configJs.MODAL_CLOSE_SEC) * 1000);
+    } catch (err) {
+        //upload the new recipe data
+        console.error("\uD83D\uDCA5", err);
+        (0, _addRecipeViewJsDefault.default).renderError(err.message);
+    }
 };
 //这个函数是订阅者，init是在程序一开始就已经开始运转了。在一开始就把controlrecipes传递到View那边。
 const init = function() {
+    (0, _bookmarksViewDefault.default).addHandlerRender(controlBookmarks);
     (0, _recipeViewJsDefault.default).addHandlerRender(controlRecipes);
     (0, _recipeViewJsDefault.default).addHandlerUpdateServings(controllerServings);
     (0, _recipeViewJsDefault.default).addHandlerAddBookmark(controlAddBookMark);
     (0, _searchViewJsDefault.default).addHandlerSearch(controlSearchResults);
     (0, _paginationViewJsDefault.default).addHandClick(controlPagination);
+    (0, _addRecipeViewJsDefault.default).addHandlerUpload(controlAddRecipe);
 // controllerServings();
 //👆不能放在这里，因为是异步函数，在这里启动这个function的话，API的数据都还没通过异步函数传过来，读取undefined的话肯定报错。要放到异步函数里面去。
 //这一部分是把数据传到function中
 };
 init();
 
-},{"core-js/modules/web.immediate.js":"49tUX","./model.js":"Y4A21","./views/recipeView.js":"l60JC","./views/searchView.js":"9OQAM","./views/resultView.js":"f70O5","./views/paginationView.js":"6z7bi","regenerator-runtime/runtime":"dXNgZ","@parcel/transformer-js/src/esmodule-helpers.js":"gkKU3"}],"49tUX":[function(require,module,exports) {
+},{"core-js/modules/web.immediate.js":"49tUX","./model.js":"Y4A21","./views/recipeView.js":"l60JC","./views/searchView.js":"9OQAM","./views/resultView.js":"f70O5","./views/paginationView.js":"6z7bi","./views/bookmarksView":"4Lqzq","regenerator-runtime/runtime":"dXNgZ","@parcel/transformer-js/src/esmodule-helpers.js":"gkKU3","./views/addRecipeView.js":"i6DNj","./config.js":"k5Hzs"}],"49tUX":[function(require,module,exports) {
 // TODO: Remove this module from `core-js@4` since it's split to modules listed below
 require("../modules/web.clear-immediate");
 require("../modules/web.set-immediate");
@@ -1782,8 +1827,11 @@ parcelHelpers.export(exports, "loadSearchResults", ()=>loadSearchResults);
 parcelHelpers.export(exports, "getSearchResultsPage", ()=>getSearchResultsPage);
 parcelHelpers.export(exports, "updateServings", ()=>updateServings);
 parcelHelpers.export(exports, "addBookmark", ()=>addBookmark);
+parcelHelpers.export(exports, "deleteBookmark", ()=>deleteBookmark);
+parcelHelpers.export(exports, "uploadRecipe", ()=>uploadRecipe);
 var _regeneratorRuntime = require("regenerator-runtime");
 var _configJs = require("./config.js");
+// import { getJSON, sendJSON } from './helpers.js';
 var _helpersJs = require("./helpers.js");
 const state = {
     recipe: {},
@@ -1795,21 +1843,32 @@ const state = {
     },
     bookmarks: []
 };
+//state就只是一个大仓库
+const createRecipeObject = function(data) {
+    //就是把data编程object的那个函数单独拿出来写了个
+    const { recipe  } = data.data;
+    return {
+        id: recipe.id,
+        title: recipe.title,
+        publisher: recipe.publisher,
+        sourceUrl: recipe.source_url,
+        image: recipe.image_url,
+        servings: recipe.servings,
+        cookingTime: recipe.cooking_time,
+        ingredients: recipe.ingredients,
+        ...recipe.key && {
+            key: recipe.key
+        }
+    };
+};
 const loadRecipe = async function(id) {
     try {
-        const data = await (0, _helpersJs.getJSON)(`${(0, _configJs.API_URL)}${id}`);
+        const data = await (0, _helpersJs.AJAX)(`${(0, _configJs.API_URL)}${id}?key=${(0, _configJs.KEY)}`);
         //把API URL换成变量了而已，其实这里就是个从link API得到数据的过程
-        const { recipe  } = data.data;
-        state.recipe = {
-            id: recipe.id,
-            title: recipe.title,
-            publisher: recipe.publisher,
-            sourceUrl: recipe.source_url,
-            image: recipe.image_url,
-            servings: recipe.servings,
-            cookingTime: recipe.cooking_time,
-            ingredients: recipe.ingredients
-        };
+        state.recipe = createRecipeObject(data);
+        if (state.bookmarks.some((bookmark)=>bookmark.id === id)) //👆意思就是在state的bookmark里面存不存在id等于当前id的（id是这个函数的接收，在前面可以看到，如果查到当前ID是被bookmark的话，就把bookmarked那个标记打开👇
+        state.recipe.bookmarked = true;
+        else state.recipe.bookmarked = false;
         console.log(state.recipe);
     } catch (err) {
         console.error(`${err}💣`);
@@ -1820,14 +1879,18 @@ const loadRecipe = async function(id) {
 const loadSearchResults = async function(query) {
     try {
         state.search.query = query;
-        const data = await (0, _helpersJs.getJSON)(`${(0, _configJs.API_URL)}?search=${query}`);
+        const data = await (0, _helpersJs.AJAX)(`${(0, _configJs.API_URL)}?search=${query}&key=${(0, _configJs.KEY)}`);
+        //这个是什么意思？👆加上了?key=${KEY}这一行的话，搜索出来的内容就也会包含那些我们后来添加的部分
         console.log(data);
         state.search.results = data.data.recipes.map((rec)=>{
             return {
                 id: rec.id,
                 title: rec.title,
                 publisher: rec.publisher,
-                image: rec.image_url
+                image: rec.image_url,
+                ...rec.key && {
+                    key: rec.key
+                }
             };
         });
         state.search.page = 1;
@@ -1852,11 +1915,71 @@ const updateServings = function(newServings) {
     });
     state.recipe.servings = newServings;
 };
+const persistBookmarks = function() {
+    localStorage.setItem("bookmarks", JSON.stringify(state.bookmarks));
+//👆用JSON.stringify来把state.bookmarks转化为一个string
+};
 const addBookmark = function(recipe) {
     //add bookmark
     state.bookmarks.push(recipe);
     //mark current recipe as a bookmark
     if (recipe.id === state.recipe.id) state.recipe.bookmarked = true;
+    persistBookmarks();
+};
+const deleteBookmark = function(id) {
+    const index = state.bookmarks.findIndex((el)=>el.id === id);
+    //findIndex方法，当后面的是true的时候，会返回那个元素的index
+    state.bookmarks.splice(index, 1);
+    //mark current recipe as not a bookmark
+    if (id === state.recipe.id) state.recipe.bookmarked = false;
+    persistBookmarks();
+};
+const init = function() {
+    const storage = localStorage.getItem("bookmarks");
+    if (storage) state.bookmarks = JSON.parse(storage);
+//上面是在把字符串还原成JSON文件
+};
+init();
+const clearBookmarks = function() {
+    localStorage.clear("bookmarks");
+};
+const uploadRecipe = async function(newRecipe) {
+    try {
+        //1) get original input and tranfrom its format to fit into API
+        //使用map因为map很适合基于一些现有数据创造新数组
+        const ingredients = Object.entries(newRecipe).filter(//Object.entries(newRecipe)就是把newRecipe再编成object
+        (entry)=>entry[0].startsWith("ingredient") && entry[1] !== "")// .map(ing => {
+        //   const ingArr = ing[1]
+        //     .replaceAll(' ', '') //需要把空的数值删掉
+        //     .split(',');
+        .map((ing)=>{
+            const ingArr = ing[1].split(",").map((el)=>el.trim());
+            const [quantity, unit, description] = ingArr;
+            if (ingArr.length !== 3) throw new Error("Wrong ingredient format! Plz use a correct one");
+            return {
+                quantity: quantity ? +quantity : null,
+                unit,
+                description
+            };
+        //ing[1]指的是之前那个arr，每个arr的第二个，也就是真正的数据
+        //“ quantity ? +quantity : null ”这个表达式是为了应对有时候quantity不存在的情况
+        });
+        const recipe = {
+            title: newRecipe.title,
+            source_url: newRecipe.sourceUrl,
+            image_url: newRecipe.image,
+            publisher: newRecipe.publisher,
+            cooking_time: +newRecipe.cookingTime,
+            servings: +newRecipe.servings,
+            ingredients
+        };
+        const data = await (0, _helpersJs.AJAX)(`${(0, _configJs.API_URL)}?key=${(0, _configJs.KEY)}`, recipe);
+        state.recipe = createRecipeObject(data);
+        addBookmark(state.recipe);
+    } catch (err) {
+        throw err;
+    }
+//👆我们只需要那些第一个元素是ingredient并且第二个元素不是空的arr，因为这个是菜单
 };
 
 },{"regenerator-runtime":"dXNgZ","./config.js":"k5Hzs","./helpers.js":"hGI1E","@parcel/transformer-js/src/esmodule-helpers.js":"gkKU3"}],"dXNgZ":[function(require,module,exports) {
@@ -2432,9 +2555,13 @@ parcelHelpers.defineInteropFlag(exports);
 parcelHelpers.export(exports, "API_URL", ()=>API_URL);
 parcelHelpers.export(exports, "TIMEOUT_SEC", ()=>TIMEOUT_SEC);
 parcelHelpers.export(exports, "RES_PER_PAGE", ()=>RES_PER_PAGE);
+parcelHelpers.export(exports, "KEY", ()=>KEY);
+parcelHelpers.export(exports, "MODAL_CLOSE_SEC", ()=>MODAL_CLOSE_SEC);
 const API_URL = "https://forkify-api.herokuapp.com/api/v2/recipes/";
 const TIMEOUT_SEC = 10;
 const RES_PER_PAGE = 10;
+const KEY = "801266c3-07eb-4201-931a-85a36624695b";
+const MODAL_CLOSE_SEC = 2.5;
 
 },{"@parcel/transformer-js/src/esmodule-helpers.js":"gkKU3"}],"gkKU3":[function(require,module,exports) {
 exports.interopDefault = function(a) {
@@ -2469,7 +2596,7 @@ exports.export = function(dest, destName, get) {
 },{}],"hGI1E":[function(require,module,exports) {
 var parcelHelpers = require("@parcel/transformer-js/src/esmodule-helpers.js");
 parcelHelpers.defineInteropFlag(exports);
-parcelHelpers.export(exports, "getJSON", ()=>getJSON);
+parcelHelpers.export(exports, "AJAX", ()=>AJAX);
 //包含几个我们重复利用的函数
 var _regeneratorRuntime = require("regenerator-runtime");
 //上面这个👆是parcel给我们加进来的
@@ -2481,9 +2608,15 @@ const timeout = function(s) {
         }, s * 1000);
     });
 };
-const getJSON = async function(url) {
+const AJAX = async function(url, uploadData) {
     try {
-        const fetchPro = fetch(url);
+        const fetchPro = uploadData ? fetch(url, {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json"
+            },
+            body: JSON.stringify(uploadData)
+        }) : fetch(url);
         const res = await Promise.race([
             fetchPro,
             timeout((0, _config.TIMEOUT_SEC))
@@ -2497,7 +2630,50 @@ const getJSON = async function(url) {
     //在helper把err throw出去，这样err就能通过controller显示出去
     //为了
     }
+//如果真的有uploadData，那么就是send，没有的话就是getJSON
+}; /*
+// use for fetch all urls
+export const getJSON = async function (url) {
+  try {
+    const fetchPro = fetch(url);
+    const res = await Promise.race([fetchPro, timeout(TIMEOUT_SEC)]);
+    //这个race的意思是，谁先被拒绝或者实现，谁就赢了，也就是说过了timeout中设置的XX秒，那么就不会fetch
+    const data = await res.json();
+    if (!res.ok) throw new Error(`${data.message} (${res.status})`);
+    return data;
+  } catch (err) {
+    throw err;
+
+    //在helper把err throw出去，这样err就能通过controller显示出去
+    //为了
+  }
 };
+
+//getJSON和sendJSON都是一个模板，因为是一个意思
+
+export const sendJSON = async function (url, uploadData) {
+  //这个函数需要两个输入
+  try {
+    const fetchPro = fetch(url, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json', //只有这样写，API才能理解我们需要发送的是JSON格式
+      },
+      body: JSON.stringify(uploadData), //需要用JSON.stringify把uploadData处理成JSON格式
+    });
+    const res = await Promise.race([fetchPro, timeout(TIMEOUT_SEC)]);
+    //这个race的意思是，谁先被拒绝或者实现，谁就赢了，也就是说过了timeout中设置的XX秒，那么就不会fetch
+    const data = await res.json();
+    if (!res.ok) throw new Error(`${data.message} (${res.status})`);
+    return data;
+  } catch (err) {
+    throw err;
+
+    //在helper把err throw出去，这样err就能通过controller显示出去
+    //为了
+  }
+};
+*/ 
 
 },{"regenerator-runtime":"dXNgZ","./config":"k5Hzs","@parcel/transformer-js/src/esmodule-helpers.js":"gkKU3"}],"l60JC":[function(require,module,exports) {
 var parcelHelpers = require("@parcel/transformer-js/src/esmodule-helpers.js");
@@ -2588,7 +2764,10 @@ class RecipeView extends (0, _viewDefault.default) {
           </div>
         </div>
 
-        <div class="recipe__user-generated">
+        <div class="recipe__user-generated ${this._data.key ? "" : "hidden"}">
+          <svg>
+              <use href="${0, _iconsSvgDefault.default}#icon-user"></use>
+          </svg>
         </div>
         <button class="btn--round btn--bookmark">
           <svg class="">
@@ -2647,12 +2826,14 @@ var _iconsSvg = require("url:../../img/icons.svg");
 var _iconsSvgDefault = parcelHelpers.interopDefault(_iconsSvg);
 class View {
     _data;
-    render(data) {
+    render(data, render = true) {
         if (!data || Array.isArray(data) && data.length === 0) return this.renderError();
         //在一开始就检查有没有数据，并且还要检查是不是一个空的数组（也就是检查有没有
         this._data = data;
         //为了储存传过来的data
         const markup = this._generateMarkup();
+        if (!render) return markup;
+        //👆之所以到这里才return markup是因为只要return了markup，数据就会变成字符串，就传不了数据了，所以要先传好数据，再return一个字符串回去
         this._clear();
         //在插入新的内容之前，需要把之前的内容清除
         this._parentElement.insertAdjacentHTML("afterbegin", markup);
@@ -2678,7 +2859,8 @@ class View {
             //isEqualNode可以比较每个节点的内容是否是相同
             //在高级DOM部分的开头有很好地介绍了节点和元素之间的区别
             //👇updates changed TEXT（说这部分是最难懂的）
-            if (!newEl.isEqualNode(curEl) && newEl.firstChild.nodeValue.trim() !== "") // console.log('💥', newEl.firstChild.nodeValue.trim());
+            if (!newEl.isEqualNode(curEl) && newEl.firstChild && //👇因为下面会报错，所以直接在上面加一行
+            newEl.firstChild.nodeValue.trim() !== "") // console.log('💥', newEl.firstChild.nodeValue.trim());
             curEl.textContent = newEl.textContent;
             //updates changed Attributes（说这部分是最难懂的）
             if (!newEl.isEqualNode(curEl)) // console.log(Array.from(newEl.attributes));
@@ -3050,42 +3232,63 @@ exports.default = new SearchView();
 },{"@parcel/transformer-js/src/esmodule-helpers.js":"gkKU3"}],"f70O5":[function(require,module,exports) {
 var parcelHelpers = require("@parcel/transformer-js/src/esmodule-helpers.js");
 parcelHelpers.defineInteropFlag(exports);
-//这个view和recipeView差不多
+//这个view和recipeView差不多 区别是它们有不同的errorMessage之类的
 var _iconsSvg = require("url:../../img/icons.svg");
 var _iconsSvgDefault = parcelHelpers.interopDefault(_iconsSvg);
 var _view = require("./View");
 var _viewDefault = parcelHelpers.interopDefault(_view);
+var _previewView = require("./previewView");
+var _previewViewDefault = parcelHelpers.interopDefault(_previewView);
 class ResultView extends (0, _viewDefault.default) {
     _parentElement = document.querySelector(".results");
     _errorMessage = "No recipes found for your query! Try again plz \uD83E\uDD7A";
     _message = "";
-    //上面这行和view有关
     _generateMarkup() {
         //在这里要返回一串数组，挨个循环，才能显示出来
         console.log(this._data);
-        return this._data.map(this._generateMarkupPreview).join("");
+        return this._data.map((result)=>(0, _previewViewDefault.default).render(result, false)).join("");
+    //👆上面这一行是在尝试render每一个bookmark，但是并不直接呈现到DOM上，而是把return的mark up变成字符串。然后render这个function是在view里，传过去的false会触发mark up代码
     }
-    _generateMarkupPreview(result) {
+}
+//没太理解为什么这里的link直接点进去就是页面了，是不是在之前做好了，现在只是把文字的html变成了图片呢——应该是
+exports.default = new ResultView(); //这样就只能有一个ResultView
+
+},{"url:../../img/icons.svg":"loVOp","./View":"5cUXS","./previewView":"1FDQ6","@parcel/transformer-js/src/esmodule-helpers.js":"gkKU3"}],"1FDQ6":[function(require,module,exports) {
+var parcelHelpers = require("@parcel/transformer-js/src/esmodule-helpers.js");
+parcelHelpers.defineInteropFlag(exports);
+var _iconsSvg = require("url:../../img/icons.svg");
+var _iconsSvgDefault = parcelHelpers.interopDefault(_iconsSvg);
+var _view = require("./View");
+var _viewDefault = parcelHelpers.interopDefault(_view);
+//这个previewview做的事情就是只为一个元素mthis._data
+class PreviewView extends (0, _viewDefault.default) {
+    _parentElement = "";
+    _generateMarkup(result) {
         const id = window.location.hash.slice(1);
         //👆这行是什么意思
         //result.id === id ? 'preview__link--active' : ''}" href="#${result.id}">👇是为了运行那个mark的系统
         return `
     <li class="preview">
-      <a class="preview__link ${result.id === id ? "preview__link--active" : ""}" href="#${result.id}">
+      <a class="preview__link ${this._data.id === id ? "preview__link--active" : ""}" href="#${this._data.id}">
         <figure class="preview__fig">
-          <img src="${result.image}" alt="${result.title}" />
+          <img src="${this._data.image}" alt="${this._data.title}" />
         </figure>
         <div class="preview__data">
-          <h4 class="preview__title">${result.title}</h4>
-          <p class="preview__publisher">${result.publisher}</p>
-        </div>
+          <h4 class="preview__title">${this._data.title}</h4>
+          <p class="preview__publisher">${this._data.publisher}</p>
+          <div class="preview__user-generated ${this._data.key ? "" : "hidden"}">
+          <svg>
+          <use href="${0, _iconsSvgDefault.default}#icon-user"></use>
+          </svg>
+          </div>
+      </div>
       </a>
     </li> 
 `;
     }
 }
 //没太理解为什么这里的link直接点进去就是页面了，是不是在之前做好了，现在只是把文字的html变成了图片呢——应该是
-exports.default = new ResultView(); //这样就只能有一个ResultView
+exports.default = new PreviewView(); //这样就只能有一个ResultView
 
 },{"url:../../img/icons.svg":"loVOp","./View":"5cUXS","@parcel/transformer-js/src/esmodule-helpers.js":"gkKU3"}],"6z7bi":[function(require,module,exports) {
 var parcelHelpers = require("@parcel/transformer-js/src/esmodule-helpers.js");
@@ -3149,6 +3352,85 @@ class PaginationView extends (0, _viewDefault.default) {
     }
 }
 exports.default = new PaginationView();
+
+},{"url:../../img/icons.svg":"loVOp","./View":"5cUXS","@parcel/transformer-js/src/esmodule-helpers.js":"gkKU3"}],"4Lqzq":[function(require,module,exports) {
+var parcelHelpers = require("@parcel/transformer-js/src/esmodule-helpers.js");
+parcelHelpers.defineInteropFlag(exports);
+//这个view和recipeView,resultview都差不多，直接复制黏贴过来的
+var _iconsSvg = require("url:../../img/icons.svg");
+var _iconsSvgDefault = parcelHelpers.interopDefault(_iconsSvg);
+var _previewView = require("./previewView");
+var _previewViewDefault = parcelHelpers.interopDefault(_previewView);
+var _view = require("./View");
+var _viewDefault = parcelHelpers.interopDefault(_view);
+class BookmarksView extends (0, _viewDefault.default) {
+    _parentElement = document.querySelector(".bookmarks__list");
+    _errorMessage = "Ooops, no bookmarks yet \uD83E\uDD14 Try to get some?";
+    _message = "";
+    //上面这行和view有关
+    addHandlerRender(handler) {
+        window.addEventListener("load", handler);
+    }
+    _generateMarkup() {
+        //在这里要返回一串数组，挨个循环，才能显示出来
+        console.log(this._data);
+        return this._data.map((bookmark)=>(0, _previewViewDefault.default).render(bookmark, false)).join("");
+    //👆上面这一行是在尝试render每一个bookmark，但是并不直接呈现到DOM上，而是把return的mark up变成字符串。然后render这个function是在view里，传过去的false会触发mark up代码
+    }
+}
+//没太理解为什么这里的link直接点进去就是页面了，是不是在之前做好了，现在只是把文字的html变成了图片呢——应该是
+exports.default = new BookmarksView(); //这样就只能有一个ResultView
+
+},{"url:../../img/icons.svg":"loVOp","./previewView":"1FDQ6","./View":"5cUXS","@parcel/transformer-js/src/esmodule-helpers.js":"gkKU3"}],"i6DNj":[function(require,module,exports) {
+var parcelHelpers = require("@parcel/transformer-js/src/esmodule-helpers.js");
+parcelHelpers.defineInteropFlag(exports);
+var _iconsSvg = require("url:../../img/icons.svg");
+var _iconsSvgDefault = parcelHelpers.interopDefault(_iconsSvg);
+var _view = require("./View");
+var _viewDefault = parcelHelpers.interopDefault(_view);
+class AddRecipeView extends (0, _viewDefault.default) {
+    _parentElement = document.querySelector(".upload");
+    _message = "Recipe was successfully uploaded! \uD83C\uDF89";
+    _window = document.querySelector(".add-recipe-window");
+    _overlay = document.querySelector(".overlay");
+    _btnOpen = document.querySelector(".nav__btn--add-recipe");
+    _btnClose = document.querySelector(".btn--close-modal");
+    constructor(){
+        super();
+        this._addHandlerShowWindow();
+        this._addHandlerHideWindow();
+    //👆这个构造函数是为了让主javascript一运行的时候就运行这个子脚本中的_addHandlerShowWindow()这个function
+    //这个运行方式和其他的就有点不一样
+    }
+    toggleWindow() {
+        this._overlay.classList.toggle("hidden");
+        this._window.classList.toggle("hidden");
+    //toggle是当classList有的时候就添加，没有的时候就删除，很适合做那种打开关上页面eventlistener
+    }
+    //👇这个addHandler一般都是拿来做和addEventListener有关的事情的
+    _addHandlerShowWindow() {
+        this._btnOpen.addEventListener("click", this.toggleWindow.bind(this));
+    }
+    _addHandlerHideWindow() {
+        this._btnClose.addEventListener("click", this.toggleWindow.bind(this));
+        this._overlay.addEventListener("click", this.toggleWindow.bind(this));
+    }
+    addHandlerUpload(handler) {
+        this._parentElement.addEventListener("submit", function(e) {
+            e.preventDefault();
+            const dataArr = [
+                ...new FormData(this)
+            ];
+            //👆这个时候this函数指向upload那个按钮，把它展开就能得到所有的数值
+            const data = Object.fromEntries(dataArr);
+            //👆dataArr被Object.fromEntries处理成一个对象，他本来只是一堆arr的集合
+            handler(data);
+        });
+    }
+    //每一个向用户呈现内容的视图都需要一个generateMarkup
+    _generateMarkup() {}
+}
+exports.default = new AddRecipeView();
 
 },{"url:../../img/icons.svg":"loVOp","./View":"5cUXS","@parcel/transformer-js/src/esmodule-helpers.js":"gkKU3"}]},["fA0o9","aenu9"], "aenu9", "parcelRequire94c2")
 
